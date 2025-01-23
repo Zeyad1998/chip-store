@@ -43,9 +43,15 @@ class My_Account {
 
         wp_localize_script(
             'chip-store-my-account-script',
-            'chipStoreMyAccount',
+            'chipStore',
             [
-                'isLoggedIn' => is_user_logged_in()
+                'ajax' => [
+                    'action'    => Ajax_Handler::CHIP_CODE_ACTION,
+                    'url'       => admin_url( 'admin-ajax.php' ),
+                    'nonce'     => wp_create_nonce( Ajax_Handler::NONCE ),
+                ],
+                'isLoggedIn' => is_user_logged_in(),
+                'chipCodeKey'   => Ajax_Handler::CHIP_CODE_KEY,
             ]
         );
     }

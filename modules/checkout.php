@@ -79,16 +79,16 @@ class Checkout {
                 'isLoggedIn'    => is_user_logged_in(),
                 'text'          => [
                     'code'   => [
-                        'nudge'             => __( 'Have a chip?', 'chip-store' ),
-                        'expand'            => __( 'Click here to enter your chip code', 'chip-store' ),
-                        'label'             => __( 'If you have a chip code, please apply it below.', 'chip-store' ),
-                        'field'             => __( 'Chip Serial Code', 'chip-store' ),
+                        'nudge'              => __( 'Have a chip? ', 'chip-store' ),
+                        'expand'             => __( 'Click here to enter your chip code', 'chip-store' ),
+                        'label'              => __( 'If you have a chip code, please apply it below.', 'chip-store' ),
+                        'placeholder'        => __( 'Chip Serial Code', 'chip-store' ),
                     ],
                     'amount' => [
-                        'nudge'              => __( 'Change chip amount?', 'chip-store' ),
+                        'nudge'              => __( 'Change chip amount? ', 'chip-store' ),
                         'expand'             => __( 'Click here to change the chip amount', 'chip-store' ),
                         'label'              => __( 'Please enter a number.', 'chip-store' ),
-                        'field'              => __( 'Chip Amount', 'chip-store' ),
+                        'placeholder'        => __( 'Chip Amount', 'chip-store' ),
                     ],
                 ],
             ]
@@ -111,7 +111,7 @@ class Checkout {
      * Handles the chip credit for the guest user.
      */
     private function handle_guest() {
-        if ( ! isset( $_SESSION ) || ! isset( $_SESSION[ Ajax_Handler::GUEST_CHIP_AMOUNT_KEY ] ) ) {
+        if ( ! isset( $_SESSION ) || empty( $_SESSION[ Ajax_Handler::GUEST_CHIP_AMOUNT_KEY ] ) ) {
             return;
         }
         Discounter::get_instance()->discount( $_SESSION[ Ajax_Handler::GUEST_CHIP_AMOUNT_KEY ] );

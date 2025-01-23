@@ -27,18 +27,6 @@ class Shop {
     }
 
     /**
-     * Retrieves the chip code from session storage and cleans it.
-     * @returns {string|null} The retrieved chip code or null if not found.
-     */
-    getAndCleanChipCode() {
-        const chipCode = sessionStorage.getItem( chipStoreShop.chipCodeKey );
-        if ( chipCode ) {
-            sessionStorage.removeItem( chipStoreShop.chipCodeKey );
-        }
-        return chipCode;
-    }
-
-    /**
      * Constructs the data payload to be sent to the server.
      * Appends action, nonce, chip code, and user information to the FormData object.
      * @returns {FormData} The constructed data payload.

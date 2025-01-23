@@ -77,7 +77,6 @@ class Plugin {
 		new Admin();
 		new Ajax_Handler();
 		new My_Account();
-		new Shop();
 		new Checkout();
 	}
 

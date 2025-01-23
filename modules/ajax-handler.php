@@ -169,9 +169,11 @@ class Ajax_Handler {
         if ( ! is_numeric( $chip_amount ) || floatval( $chip_amount ) <= 0 ) {
             wp_send_json_error( __( 'Invalid Chip Amount.', 'chip-store' ), 400 );
         }
+
         $chip_amount = floatval( $chip_amount );
-        if ( $chip_amount > Chip::get_value( $chip->ID ) ) {
-            wp_send_json_error( __( 'Chip Amount Exceeds Maximum.', 'chip-store' ) );
+        $chip_value = Chip::get_value( $chip->ID );
+        if ( $chip_amount > $chip_value ) {
+            wp_send_json_error( __( 'Chip Amount Exceeds Maximum: ' . $chip_value, 'chip-store' ) );
         }
 
         $_SESSION[ self::GUEST_CHIP_AMOUNT_KEY ] = $chip_amount;

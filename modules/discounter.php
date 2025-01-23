@@ -2,6 +2,9 @@
 
 namespace Chip_Store;
 
+
+use WC_Tax;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit; // Exit if accessed directly
 }
@@ -53,7 +56,7 @@ class Discounter {
      * @param float $amount The discount amount.
      */
     public function discount( $amount ) {
-        $this->discount_amount = -$amount;
+        $this->discount_amount = $amount;
         add_action( 'woocommerce_cart_calculate_fees', [ $this, 'modify_fees' ] );
     }
 
@@ -67,6 +70,25 @@ class Discounter {
             return;
         }
 
-        $cart->add_fee( __( 'Chip Credit', 'chip-store' ), $this->discount_amount );
+        $cart->add_fee( __( 'Chip Credit', 'chip-store' ), - ( $this->discount_amount /  $this->get_tax_rate() ) );
+    }
+
+    /**
+     * Gets the tax rate.
+     *
+     * @return float
+     */
+    private function get_tax_rate() {
+        $tax_rates = WC_Tax::get_rates();
+        $tax_rate = 0;
+
+        if ( ! empty( $tax_rates ) ) {
+            $tax_rate = array_shift( $tax_rates );
+            $tax_rate = $tax_rate['rate'];
+        }
+
+        $tax_rate = 1 +( $tax_rate / 100 );
+
+        return $tax_rate;
     }
 }

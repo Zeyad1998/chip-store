@@ -6,43 +6,92 @@ class MyAccount {
      * Constructor initializes the chip code and checks the URL for chip code.
      */
     constructor() { 
-        this.chipCode = null; 
-        this.checkAndStoreChipCode(); 
+        this.processChipCode(); 
     }
 
     /**
-     * Checks if the user is logged in and redirects to the shop page if true.
+     * Processes the chip code from the URL query string.
      */
-    redirectToShopIfLoggedIn() {
-        if ( window.chipStoreMyAccount.isLoggedIn ) {
-            window.location.href = '/shop';
-        }
-    }
-
-    /**
-     * Checks the URL for the 'chip_code' query parameter, stores it, and removes it from the URL.
-     */
-    checkAndStoreChipCode() { 
+    processChipCode() { 
         const urlParams = new URLSearchParams( window.location.search ); 
-        if ( ! urlParams.has( 'chip_code' ) || sessionStorage.getItem( 'chip_code' ) ) { // If chip code is not in the URL or already stored in session storage
+        this.chipCode = urlParams.get( chipStore.chipCodeKey );
+
+        if ( ! this.chipCode ) {
             return;
         }
 
-        this.chipCode = urlParams.get( 'chip_code' ); 
-        urlParams.delete( 'chip_code' ); 
-        this.updateUrl( urlParams );
-        sessionStorage.setItem( 'chip_code', this.chipCode );
-        this.redirectToShopIfLoggedIn();
+        if ( chipStore.isLoggedIn ) {
+            this.sendAjaxAndRedirectToShop();
+        } else {
+            this.handleGuestButton();
+        }
     }
 
     /**
-     * Updates the URL by removing the 'chip_code' query parameter without redirecting.
-     * 
-     * @param { URLSearchParams } urlParams - The URLSearchParams object without the 'chip_code' parameter.
+     * Finds the button with the ID "continue-as-a-guest-btn" and adds an event listener to send the chip code via AJAX and then redirect to the shop page.     */
+    handleGuestButton() {
+        const guestButton = document.getElementById( 'continue-as-guest-btn' );
+        if ( ! guestButton ) {
+            return;
+        }
+
+        guestButton.addEventListener( 'click', ( event ) => {
+            event.preventDefault();
+            this.sendAjaxAndRedirectToShop();
+        } );
+    }
+
+    sendAjaxAndRedirectToShop() {
+        this.sendAjax()
+            .then( () => window.location.href = '/shop' );
+    }
+
+    /**
+     * Sends the data payload via a POST request to the server.
+     *
+     * @returns {Promise} The fetch promise.
      */
-    updateUrl( urlParams ) { 
-        const newUrl = window.location.pathname + ( urlParams.toString() ? '?' + urlParams.toString() : '' );
-        window.history.replaceState( {}, document.title, newUrl ); 
+    async sendAjax() {
+        const data = new FormData();
+        // Append action and nonce to the data payload
+        data.append( 'action', chipStore.ajax.action );
+        data.append( '_ajax_nonce', chipStore.ajax.nonce );
+        
+        // Append chip code to the data payload
+        data.append( chipStore.chipCodeKey, this.chipCode );
+
+        return fetch( chipStore.ajax.url, {
+            method: 'POST',
+            body: data
+        } )
+            .catch( this.errorCallback )
+            .then( ( response ) => response.json() )
+            .then( this.successCallback )
+    }
+
+    /**
+     * Callback function to handle a successful response from the server.
+     *
+     * @param {*} response The response from the server.
+     */
+    successCallback( response ) {
+        if ( true !== response.success ) {
+            if ( response.data ) {
+                alert( response.data );
+            } else {
+                alert( 'An unknown error occurred.' );
+            }
+            return Promise.reject( response );
+        }
+    }
+
+    /**
+     * Callback function to handle an error response from the server.
+     *
+     * @param {*} error The error from the server.
+     */
+    errorCallback( error ) {
+        alert( 'A server side error has occurred while sending the chip code.' );
     }
 } 
 

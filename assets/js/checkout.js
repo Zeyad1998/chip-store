@@ -32,55 +32,81 @@ class Checkout {
         if ( ! this.couponField ) {
             return;
         }
-
-        this.couponContainer = this.couponField.closest( '.e-coupon-box' );
-        this.paragraph = this.couponContainer.querySelector( 'p.e-woocommerce-coupon-nudge' );
-        this.expandAnchor = this.couponContainer.querySelector( 'a.e-show-coupon-form' );
-        this.couponLabel = this.couponContainer.querySelector( 'label' );
-        this.submitButton = this.couponContainer.querySelector( 'button[type="submit"]' );
-
-        this.modifyCouponField();
-    }
-
-    modifyCouponField() {
-        if ( ! this.couponField || ! this.submitButton || ! this.couponContainer ) {
+        const couponContainer = this.couponField.closest( '.e-coupon-box' );
+        if ( ! couponContainer ) {
             return;
         }
+        this.insertChipBox( couponContainer );
+    }
+
+    insertChipBox( couponContainer ) {
+        const chipContainer = couponContainer.cloneNode( true );
+        chipContainer.innerHTML = chipContainer.innerHTML.replace( /coupon/g, 'chip' );
+        couponContainer.parentNode.insertBefore( chipContainer, couponContainer );
 
         // Always shown to logged in users
         if ( chipStoreCheckout.isLoggedIn ) {
-            this.changeField( 'code' );
+            this.changeField( chipContainer, 'code' );
             return;
         }
 
         // Shown to guests if no chip id is found in the current session
         if ( ! chipStoreCheckout.guestChip.id ) {
-            this.changeField( 'code' );
+            this.changeField( chipContainer, 'code' );
             return;
         }
 
-        this.changeField( 'amount' );
+        this.changeField( chipContainer, 'amount' );
     }
 
-    changeField( context ) {
-        this.couponLabel.textContent = chipStoreCheckout.text[ context ].label;
-        this.couponField.placeholder = chipStoreCheckout.text[ context ].field;
+    changeField( chipContainer, context ) {
+        const chipField = document.getElementById( 'chip_code' );
+        const submitButton = chipContainer.querySelector( 'button[type="submit"]' );
 
+        this.changeText( chipContainer, chipField, context );
+
+        // Number input for amount context and restrict input to max subtotal
         if ( 'amount' === context ) {
-            this.couponField.type = 'number';
-            this.couponField.addEventListener( 'input', () => {
-                if ( parseFloat( this.couponField.value ) > chipStoreCheckout.woocommerce.subtotal ) {
-                    this.couponField.value = chipStoreCheckout.woocommerce.subtotal;
+            chipField.type = 'number';
+            chipField.addEventListener( 'input', () => {
+                if ( parseFloat( chipField.value ) > chipStoreCheckout.woocommerce.subtotal ) {
+                    chipField.value = chipStoreCheckout.woocommerce.subtotal;
                 }
             } );
         }
 
-        this.submitButton = this.removeAllEventListeners( this.submitButton );
-        this.submitButton.addEventListener( 'click', () => this.sendAjax(
+        // "Apply" button to send the chip code/amount
+        submitButton.addEventListener( 'click', () => this.sendAjax(
             chipStoreCheckout.ajax.action[ context ],
             chipStoreCheckout.ajax.keys[ context ],
-            this.couponField.value
+            chipField.value
         ) );
+    }
+
+    changeText( chipContainer, chipField, context ) {
+        const paragraph = chipContainer.querySelector( 'p.e-woocommerce-chip-nudge' );
+        const label = chipContainer.querySelector( 'label' );
+
+        label.textContent = chipStoreCheckout.text[ context ].label;
+        chipField.placeholder = chipStoreCheckout.text[ context ].placeholder;
+
+        // Replace nudge paragraph text and re-add the anchor
+        if ( paragraph ) {
+            const anchor = paragraph.querySelector( 'a' );
+            paragraph.textContent = chipStoreCheckout.text[ context ].nudge;
+            if ( anchor ) {
+                paragraph.appendChild( anchor );
+                anchor.addEventListener( 'click', (event) => {
+                    event.preventDefault();
+                    const chipAnchorDiv = chipContainer.querySelector( 'div.e-chip-anchor' );
+                    if ( chipAnchorDiv ) {
+                        chipAnchorDiv.style.display = 'none' === chipAnchorDiv.style.display ? '' : 'none';
+                    }
+                } );
+                // Change expand anchor text
+                anchor.textContent = chipStoreCheckout.text[ context ].expand;
+            }
+        }
     }
 
     /**
