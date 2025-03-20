@@ -151,7 +151,9 @@ class Checkout {
         if ( 0 >= (float) CHIP::get_value( $chip_id ) ) {
             CHIP::consume( $chip_id );
         }
-        CHIP::update_owner( $chip_id, 'Guest' );
+
+        $guest_email = $order->get_billing_email();
+        CHIP::update_owners( $chip_id, 'Guest: ' . $guest_email );
 
         $_SESSION[ Ajax_Handler::GUEST_CHIP_ID_KEY ] = '';
         $_SESSION[ Ajax_Handler::GUEST_CHIP_CREDIT_KEY ] = 0;

@@ -131,6 +131,11 @@ class Ajax_Handler {
             return;
         }
 
+        if ( Chip::is_expired( $chip->ID ) ) {
+            wp_send_json_error( __( 'This Chip Has Expired.', 'chip-store' ) );
+            return;
+        }
+
         $chip_value = Chip::get_value( $chip->ID );
         if ( is_user_logged_in() ) {
             self::update_user_credit( $chip_value );
@@ -155,6 +160,11 @@ class Ajax_Handler {
         } else {
             $chip_id = sanitize_text_field( $_POST[ Ajax_Handler::GUEST_CHIP_ID_KEY ] );
             $chip = get_post( $chip_id );
+        }
+
+        if ( Chip::is_expired( $chip->ID ) ) {
+            wp_send_json_error( __( 'This Chip Has Expired.', 'chip-store' ) );
+            return;
         }
 
         if ( Chip::is_consumed( $chip->ID ) ) {
@@ -241,7 +251,7 @@ class Ajax_Handler {
      */
     private static function update_chip( $chip_id ) {
         Chip::consume( $chip_id );
-        Chip::update_owner( $chip_id, wp_get_current_user()->user_email );
+        Chip::update_owners( $chip_id, wp_get_current_user()->user_email );
         Chip::update_value( $chip_id, 0 );
     }
 }

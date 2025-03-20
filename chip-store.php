@@ -23,4 +23,8 @@ if ( ! in_array( 'woocommerce/woocommerce.php', get_option( 'active_plugins' ) )
 	exit; // Exit if WooCommerce is not active.
 }
 
+if (file_exists (__DIR__ . '/vendor/autoload.php' ) ) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
+
 require CHIP_STORE_PATH . 'includes/plugin.php';

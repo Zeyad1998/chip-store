@@ -34,8 +34,8 @@ class Admin {
                 'callback' => [ Chip::class, 'render_value_meta_box' ],
             ],
             [
-                'id' => Chip::NAME . '_owner',
-                'callback' => [ Chip::class, 'render_owner_meta_box' ],
+                'id' => Chip::NAME . '_owners',
+                'callback' => [ Chip::class, 'render_owners_meta_box' ],
             ],
             [
                 'id' => Chip::NAME . '_consumed',
@@ -44,6 +44,10 @@ class Admin {
             [
                 'id' => Chip::NAME . '_code',
                 'callback' => [ Chip::class, 'render_code_meta_box' ],
+            ],
+            [
+                'id' => Chip::NAME . '_qr_code',
+                'callback' => [ Chip::class, 'render_qrcode_meta_box' ],
             ]
         ];
 
@@ -55,7 +59,8 @@ class Admin {
             $meta_boxes,
             Chip::NONCE,
             Chip::NONCE_ACTION,
-            [ Chip::class, 'save_unique_chip_code' ], // Save post callback
+            [ Chip::class, 'save_chip' ], // Save post callback
+            [ Chip::class, 'delete_chip' ], // Delete post callback
             [ Chip::class, 'filter_columns' ], // Columns callback
             [ Chip::class, 'custom_columns' ], // Custom columns callback
         );

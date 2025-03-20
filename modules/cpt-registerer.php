@@ -54,8 +54,23 @@ class CPT_Registerer {
      * @param string $nonce The nonce for the meta boxes.
      * @param string $nonce_action The nonce action for the meta boxes.
      * @param string $save_callback The callback function to save the post.
+     * @param string $delete_callback The callback function to delete the post.
+     * @param string $filter_columns_callback The callback function to filter the columns.
+     * @param string $custom_columns_callback The callback function to add custom columns.
      */
-    public function __construct( $name, $description, $supports, $icon, $meta_boxes = [], $nonce = '', $nonce_action = '', $save_callback = '', $filter_columns_callback = '', $custom_columns_callback = '' ) {
+    public function __construct(
+        $name,
+        $description,
+        $supports,
+        $icon,
+        $meta_boxes = [],
+        $nonce = '',
+        $nonce_action = '',
+        $save_callback = '',
+        $delete_callback = '',
+        $filter_columns_callback = '',
+        $custom_columns_callback = ''
+    ) {
         $this->name = $name;
         $label = ucfirst( $name );
         $plural_label = $label . 's';
@@ -94,6 +109,10 @@ class CPT_Registerer {
             add_action( 'save_post_' . $this->name, $save_callback, 10, 2 );
         }
 
+        if ( ! empty( $delete_callback ) ) {
+            add_action( 'before_delete_post', $delete_callback );
+        }
+
         if ( ! empty( $filter_columns_callback ) && ! empty( $custom_columns_callback ) ) {
             add_filter( 'manage_' . $this->name . '_posts_columns', $filter_columns_callback );
             add_action( 'manage_' . $this->name . '_posts_custom_column', $custom_columns_callback, 10, 2 );
@@ -116,7 +135,10 @@ class CPT_Registerer {
 
     public function register_meta_boxes() {
         foreach ( $this->meta_boxes as $meta_box ) {
-            $title = ucfirst( str_replace( '_', ' ', $meta_box[ 'id' ] ) );
+            $title = ucwords( str_replace( '_', ' ', $meta_box[ 'id' ] ) );
+            $title = preg_replace_callback( '/\b\w{1,2}\b/', function( $matches ) {
+                return strtoupper( $matches[ 0 ] );
+            }, $title );
 
             add_meta_box(
                 $meta_box[ 'id' ] . '_meta_box', // ID
@@ -143,7 +165,7 @@ class CPT_Registerer {
                 }
                 update_post_meta(
                     $post_id,
-                    '_' . $meta_box[ 'id' ], // Meta key, underscore to hide it from the custom fields list
+                    '_' . $meta_box[ 'id' ],
                     $sanitized_value
                 );
             }

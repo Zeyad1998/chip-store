@@ -5,6 +5,11 @@ namespace Chip_Store;
 use Random\Randomizer;
 use Random\Engine\Secure;
 
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit; // Exit if accessed directly.
 }
@@ -20,13 +25,6 @@ class Chip {
      * @var string NAME The name of the entity.
      */
     public const NAME = 'chip';
-
-    /**
-     * The Encryptor instance.
-     *
-     * @var Encryptor $encryptor The Encryptor instance.
-     */
-    private $encryptor;
 
     /**
      * The icon for the custom post type.
@@ -67,39 +65,10 @@ class Chip {
     }
 
     /**
-     * Get the chip value meta key.
-     *
-     * @return string The chip value meta key.
+     * Get the meta key for the given key.
      */
-    private static function get_value_meta_key() {
-        return '_' . self::NAME . '_value';
-    }
-
-    /**
-     * Get the chip owner meta key.
-     *
-     * @return string The chip owner meta key.
-     */
-    private static function get_owner_meta_key() {
-        return '_' . self::NAME . '_owner';
-    }
-
-    /**
-     * Get the chip consumed meta key.
-     *
-     * @return string The chip consumed meta key.
-     */
-    private static function get_consumed_meta_key() {
-        return '_' . self::NAME . '_consumed';
-    }
-
-    /**
-     * Get the chip code meta key.
-     *
-     * @return string The chip code meta key.
-     */
-    private static function get_code_meta_key() {
-        return '_' . self::NAME . '_code';
+    private static function get_meta_key( $key ) {
+        return '_' . self::NAME . '_' . $key;
     }
 
     /**
@@ -109,7 +78,7 @@ class Chip {
      * @return float The chip value.
      */
     public static function get_value( $chip_id ) {
-        return get_post_meta( $chip_id, self::get_value_meta_key(), true );
+        return get_post_meta( $chip_id, self::get_meta_key( 'value' ), true );
     }
 
     /**
@@ -120,7 +89,7 @@ class Chip {
      * @return void
      */
     public static function update_value( $post_id, $value ) {
-        update_post_meta( $post_id, self::get_value_meta_key(), $value );
+        update_post_meta( $post_id, self::get_meta_key( 'value' ), $value );
     }
 
     /**
@@ -145,7 +114,19 @@ class Chip {
      * @return bool Whether the chip is consumed or not.
      */
     public static function is_consumed( $chip_id ) {
-        return get_post_meta( $chip_id, self::get_consumed_meta_key(), true );
+        return get_post_meta( $chip_id, self::get_meta_key( 'consumed' ), true );
+    }
+
+    /**
+     * Is the chip expired?
+     * 
+     * @param int $chip_id The chip ID.
+     * 
+     * @return bool Whether the chip is expired or not.
+     */
+    public static function is_expired( $chip_id ) {
+        $expiration_date = get_post_meta( $chip_id, '_chip_expiration_date', true );
+        return strtotime( $expiration_date ) < time();
     }
 
     /**
@@ -156,25 +137,28 @@ class Chip {
      * @return void
      */
     public static function consume( $post_id ) {
-        update_post_meta( $post_id, self::get_consumed_meta_key(), true );
+        update_post_meta( $post_id, self::get_meta_key( 'consumed' ), true );
     }
 
     /**
-     * Update the chip owner meta.
+     * Update the chip owners meta.
      *
      * @param int $post_id The post ID.
-     * @param string $owner The new owner.
+     * @param string $owners The new owners.
      *
      * @return void
      */
-    public static function update_owner( $post_id, $new_owner ) {
-        $owners = get_post_meta( $post_id, self::get_owner_meta_key(), true );
+    public static function update_owners( $post_id, $new_owner ) {
+        $meta_key = self::get_meta_key( 'owners' );
+
+        $owners = get_post_meta( $post_id, $meta_key, true );
         if ( ! empty( $owners ) ) {
             $owners .= ', ' . $new_owner;
         } else {
             $owners = $new_owner;
         }
-        update_post_meta( $post_id, self::get_owner_meta_key(), $owners );
+
+        update_post_meta( $post_id, $meta_key, $owners );
     }
 
     /**
@@ -183,7 +167,7 @@ class Chip {
      * @param WP_Post $post The post object.
      */
     public static function render_value_meta_box( $post ) {
-        $value = get_post_meta( $post->ID, self::get_value_meta_key(), true );
+        $value = self::get_value( $post->ID );
         self::insert_nonce();
 
         ?>
@@ -193,17 +177,30 @@ class Chip {
     }
 
     /**
-     * Renders the chip owner meta box.
+     * Renders the chip owners meta box.
      *
      * @param WP_Post $post The post object.
      */
-    public static function render_owner_meta_box( $post ) {
-        $owner = get_post_meta( $post->ID, self::get_owner_meta_key(), true );
+    public static function render_owners_meta_box( $post ) {
+        $owners = get_post_meta( $post->ID, self::get_meta_key( 'owners' ), true );
+        if ( empty( $owners ) ) {
+            $owners = get_post_meta( $post->ID, self::get_meta_key( 'owner' ), true ); // Backward compatibility.
+        }
         self::insert_nonce();
 
         ?>
-        <label for="chip_owner"><?php echo __( 'Owner', 'chip-store' ); ?></label>
-        <input type="text" id="chip_owner" name="chip_owner" value="<?php echo esc_attr( $owner ); ?>" style="width: 100%;" />
+        <div id="chip_owners" style="width: 100%;">
+            <?php
+            if ( ! empty( $owners ) ) {
+                $owners = explode( ', ', $owners );
+                foreach ( $owners as $owner ) {
+                    echo '<p>' . esc_html( $owner ) . '</p>';
+                }
+            } else {
+                echo '<p>' . __( 'No one has used this chip yet.', 'chip-store' ) . '</p>';
+            }
+            ?>
+        </div>
         <?php
     }
 
@@ -213,7 +210,7 @@ class Chip {
      * @param WP_Post $post The post object.
      */
     public static function render_consumed_meta_box( $post ) {
-        $consumed = get_post_meta( $post->ID, self::get_consumed_meta_key(), true );
+        $consumed = get_post_meta( $post->ID, self::get_meta_key( 'consumed' ), true );
         self::insert_nonce();
 
         ?>
@@ -231,7 +228,7 @@ class Chip {
      * @param WP_Post $post The post object.
      */
     public static function render_code_meta_box( $post ) {
-        $encrypted_code = get_post_meta( $post->ID, self::get_code_meta_key(), true );
+        $encrypted_code = get_post_meta( $post->ID, self::get_meta_key( 'code' ), true );
 
         $decrypted_code = '';
         if ( ! empty( $encrypted_code ) ) {
@@ -246,6 +243,22 @@ class Chip {
     }
 
     /**
+     * Renders the QR code meta box.
+     *
+     * @param WP_Post $post The post object.
+     */
+    public static function render_qrcode_meta_box( $post ) {
+        $attachment_id = get_post_meta( $post->ID, self::get_meta_key( 'qrcode' ), true );
+        $qrcode_url = wp_get_attachment_url( $attachment_id );
+
+        if ( $qrcode_url ) {
+            echo '<a href="' . esc_url( $qrcode_url ) . '" download><img src="' . esc_url( $qrcode_url ) . '" alt="' . esc_attr__( 'QR Code', 'chip-store' ) . '" style="max-width: 100%; height: auto;" /></a>';
+        } else {
+            echo '<p>' . esc_html__( 'QR Code not available.', 'chip-store' ) . '</p>';
+        }
+    }
+
+    /**
      * Save the meta box data.
      *
      * @param int $post_id The post ID.
@@ -255,12 +268,12 @@ class Chip {
     }
 
     /**
-     * Save generated unique chip code.
-     *
+     * Save data on the chip that's not handled by meta boxes.
+     * 
      * @param int $post_id The post ID.
      * @param WP_Post $post The post object.
      */
-    public static function save_unique_chip_code( $post_id, $post ) {
+    public static function save_chip( $post_id, $post ) {
         // Doing this to avoid pulluting the database. As drafts are not supprted for this CPT and thus cannot be deleted after creation to clean up the database.
         if ( 'publish' !== $post->post_status ) {
             return;
@@ -271,8 +284,20 @@ class Chip {
             return;
         }
 
+        self::save_unique_chip_code( $post_id, $post );
+        self::save_qrcode( $post_id, $post );
+        self::save_expiration_date( $post_id, $post );
+    }
+
+    /**
+     * Save generated unique chip code.
+     *
+     * @param int $post_id The post ID.
+     * @param WP_Post $post The post object.
+     */
+    private static function save_unique_chip_code( $post_id, $post ) {
         // Check if the chip code already exists.
-        $chip_code = get_post_meta( $post_id, self::get_code_meta_key(), true );
+        $chip_code = get_post_meta( $post_id, self::get_meta_key( 'code' ), true );
         if ( ! empty( $chip_code ) ) {
             return;
         }
@@ -285,7 +310,73 @@ class Chip {
         $encrypted_code = Encryptor::getInstance()->encrypt( $unique_code );
 
         // Save the encrypted unique chip code as post meta.
-        update_post_meta( $post_id, self::get_code_meta_key(), $encrypted_code );
+        update_post_meta( $post_id, self::get_meta_key( 'code' ), $encrypted_code );
+    }
+
+    private static function save_qrcode( $post_id, $post ) {
+        // Check if the QR code image already exists.
+        $attachment_id = get_post_meta( $post_id, self::get_meta_key( 'qrcode' ), true );
+        if ( ! empty( $attachment_id ) ) {
+            return;
+        }
+
+        // Generate the QR code image.
+        $url = self::get_chip_url( $post_id );
+        $qrCode = new QrCode( $url, new Encoding('UTF-8'), ErrorCorrectionLevel::Low, 75, 0 );
+        $writer = new PngWriter();
+        $qrCodeImage = $writer->write( $qrCode );
+
+        // Save the QR code image as an attachment.
+        $file_path = self::get_qrcode_image_filepath( $post_id );
+        file_put_contents( $file_path, $qrCodeImage->getString() );
+
+        $attachment = [
+            'guid'           => $file_path,
+            'post_mime_type' => 'image/png',
+            'post_title'     => 'Chip QR Code ' . $post_id,
+            'post_content'   => '',
+            'post_status'    => 'inherit'
+        ];
+
+        $attachment_id = wp_insert_attachment( $attachment, $file_path, $post_id );
+        // require_once( ABSPATH . 'wp-admin/includes/image.php' );
+        // $attach_data = wp_generate_attachment_metadata( $attach_id, $file_path );
+        // wp_update_attachment_metadata( $attach_id, $attach_data );
+
+        // Save the attachment ID as post meta.
+        update_post_meta( $post_id, self::get_meta_key( 'qrcode' ), $attachment_id );
+    }
+
+    /**
+     * Save the expiration date for the chip.
+     *
+     * @param int $post_id The post ID.
+     * @param WP_Post $post The post object.
+     */
+    private static function save_expiration_date( $post_id, $post ) {
+        // Check if the expiration date already exists.
+        $expiration_date = get_post_meta( $post_id, '_chip_expiration_date', true );
+        if ( ! empty( $expiration_date ) ) {
+            return;
+        }
+
+        // Calculate the expiration date (90 days from the current date).
+        $expiration_date = date( 'Y/m/d', strtotime( '+90 days' ) );
+        // $expiration_date = date( 'Y/m/d H:i:s', strtotime( '+5 minutes' ) ); // For testing purposes.
+
+        // Save the expiration date as post meta.
+        update_post_meta( $post_id, '_chip_expiration_date', $expiration_date );
+    }
+
+    public static function delete_chip( $post_id ) {
+        // Check if the post type is 'chip'.
+        if ( self::NAME !== get_post_type( $post_id ) ) {
+            return;
+        }
+
+        // Delete the QR code image attachment.
+        $attachment_id = get_post_meta( $post_id, self::get_meta_key( 'qrcode' ), true );
+        wp_delete_attachment( $attachment_id, true );
     }
 
     /**
@@ -295,11 +386,12 @@ class Chip {
      * @return array The modified columns.
      */
     public static function filter_columns( $columns ) {
-        $columns[ self::NAME . '_value' ] = __( 'Value', 'chip-store' );
-        $columns[ self::NAME . '_owner' ] = __( 'Owner', 'chip-store' );
-        $columns[ self::NAME . '_consumed' ] = __( 'Consumed', 'chip-store' );
-        $columns[ self::NAME . '_url' ] = __( 'URL', 'chip-store' );
-        unset( $columns[ 'date' ] );
+        $columns[ 'expiration_date' ] = __( 'Expiration Date', 'chip-store' );
+        $columns[ 'value' ] = __( 'Value', 'chip-store' );
+        $columns[ 'consumed' ] = __( 'Consumed', 'chip-store' );
+        $columns[ 'owners' ] = __( 'Owners', 'chip-store' );
+        $columns[ 'url' ] = __( 'URL', 'chip-store' );
+        $columns[ 'qrcode' ] = __( 'QR Code', 'chip-store' );
 
         return $columns;
     }
@@ -312,33 +404,90 @@ class Chip {
      */
     public static function custom_columns( $column, $post_id ) {
         switch ( $column ) {
-            case 'chip_value':
-                $value = get_post_meta( $post_id, self::get_value_meta_key(), true );
+
+            case 'value':
+                $value = self::get_value( $post_id );
                 echo esc_html( $value );
                 break;
 
-            case 'chip_owner':
-                $owner = get_post_meta( $post_id, self::get_owner_meta_key(), true );
-                $owners = explode( ', ', $owner );
-                foreach ( $owners as $single_owner ) {
-                    echo esc_html( $single_owner ) . '<br>';
+            case 'owners':
+                $owners = get_post_meta( $post_id, self::get_meta_key( 'owners' ), true );
+                if ( empty( $owners ) ) {
+                    $owners = get_post_meta( $post_id, self::get_meta_key( 'owner' ), true ); // Backward compatibility.
+                }
+                if ( empty( $owners ) ) {
+                    echo '-';
+                } else {
+                    $owners = explode( ', ', $owners );
+                    foreach ( $owners as $owner ) {
+                        echo esc_html( $owner ) . '<br>';
+                    }
                 }
                 break;
 
-            case 'chip_consumed':
-                $consumed = get_post_meta( $post_id, self::get_consumed_meta_key(), true );
+            case 'consumed':
+                $consumed = get_post_meta( $post_id, self::get_meta_key( 'consumed' ), true );
                 echo esc_html( $consumed ? __( 'True', 'chip-store' ) : __( 'False', 'chip-store' ) );
                 break;
 
-            case 'chip_url':
-                $encrypted_code = get_post_meta( $post_id, '_chip_code', true );
-                $chip_code = '';
-                if ( ! empty( $encrypted_code ) ) {
-                    $chip_code = Encryptor::getInstance()->decrypt( $encrypted_code );
-                }
-                $url = site_url( 'my-account' ) . '?chip_code=' . urlencode( $chip_code );
+            case 'url':
+                $url = self::get_chip_url( $post_id );
                 echo '<a href="' . esc_url( $url ) . '" target="_blank">' . esc_html( $url ) . '</a>';
                 break;
+
+            case 'expiration_date':
+                $expiration_date = get_post_meta( $post_id, self::get_meta_key( 'expiration_date' ), true );
+                if ( empty( $expiration_date ) ) {
+                    echo '-';
+                } else {
+                    echo esc_html( $expiration_date );
+                }
+                break;
+
+            case 'qrcode':
+                $attachment_id = get_post_meta( $post_id, self::get_meta_key( 'qrcode' ), true );
+                $qrcode_url = wp_get_attachment_url( $attachment_id );
+                if ( $qrcode_url ) {
+                    echo '<a href="' . esc_url( $qrcode_url ) . '" download><img src="' . esc_url( $qrcode_url ) . '" alt="' . esc_attr__( 'QR Code', 'chip-store' ) . '" style="max-width: 100%; height: auto;" /></a>';
+                } else {
+                    echo '<p>' . esc_html__( 'QR Code not available.', 'chip-store' ) . '</p>';
+                }
+                break;
         }
+    }
+
+    /**
+     * Generate the chip URL.
+     *
+     * @param int $chip_id The chip ID.
+     *
+     * @return string The chip URL.
+     */
+    private static function get_chip_url( $chip_id ) {
+        return site_url( 'my-account' ) . '?chip_code=' . self::get_decrypted_chip_code( $chip_id );
+    }
+
+    /**
+     * Get the file path for the QR code image.
+     *
+     * @param int $chip_id The chip ID.
+     *
+     * @return string The file path for the QR code image.
+     */
+    private static function get_qrcode_image_filepath( $chip_id ) {
+        $upload_dir = wp_upload_dir();
+        return $upload_dir[ 'path' ] . '/' . self::get_decrypted_chip_code( $chip_id ) . '-qrcode.png';
+    }
+
+    /**
+     * Get the decrypted chip code.
+     *
+     * @param int $chip_id The chip ID.
+     *
+     * @return string The decrypted chip code.
+     */
+    private static function get_decrypted_chip_code( $chip_id ) {
+        $encrypted_code = get_post_meta( $chip_id, self::get_meta_key( 'code' ), true );
+        return Encryptor::getInstance()->decrypt( $encrypted_code );
     }
 }
